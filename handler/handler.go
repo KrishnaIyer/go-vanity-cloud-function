@@ -19,6 +19,7 @@ import (
 	"context"
 	"fmt"
 	"html/template"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
@@ -45,7 +46,6 @@ type Handler struct {
 	host         string
 	cacheControl string
 	paths        pathConfigSet
-	config       config
 }
 
 type pathConfigSet []pathConfig
@@ -90,7 +90,8 @@ var client = &http.Client{
 
 // InitHandler initializes the global handler.
 // This is non-idiomatic but is optimised for google cloud functions.
-// The config is parsed from a yaml file fetched from an external source (GoogleCloudStorage/Github).
+// The config is parsed from a yaml file
+// - Fetched from an external source (GoogleCloudStorage/Github).
 func InitHandler(ctx context.Context, configURL string) error {
 	// Fetch the config file from the remote path
 	res, err := client.Get(configURL)
@@ -98,20 +99,17 @@ func InitHandler(ctx context.Context, configURL string) error {
 		log.Printf("Could not fetch config file: %v\n", err)
 		return err
 	}
-
 	if res.StatusCode != http.StatusOK {
 		log.Printf("Could not fetch config file: %v\n", res.StatusCode)
 		return fmt.Errorf("could not fetch config file: %v", res.StatusCode)
 	}
-
 	// Read out the configuration
-	var raw []byte
-	n, err := res.Body.Read(raw)
+	raw, err := ioutil.ReadAll(res.Body)
 	if err != nil {
 		log.Printf("Could not read config file: %v\n", err)
 		return fmt.Errorf("could not read config file: %v", err)
 	}
-	if n == 0 {
+	if len(raw) == 0 {
 		log.Println("Found empty config file")
 		return fmt.Errorf("found empty config file")
 	}
@@ -123,17 +121,48 @@ func InitHandler(ctx context.Context, configURL string) error {
 		return fmt.Errorf("could not parse config: %v", err)
 	}
 
-	handler.config = config
+	handler.host = config.Host
+	cacheAge := int64(86400) // 24 hours (in seconds)
+	if config.CacheAge != nil {
+		cacheAge = *config.CacheAge
+		if cacheAge < 0 {
+			return fmt.Errorf("cache_max_age is negative")
+		}
+	}
+	handler.cacheControl = fmt.Sprintf("public, max-age=%d", cacheAge)
+	for path, e := range config.Paths {
+		pc := pathConfig{
+			path:    strings.TrimSuffix(path, "/"),
+			repo:    e.Repo,
+			display: e.Display,
+			vcs:     e.VCS,
+		}
+		switch {
+		case e.Display != "":
+		case strings.HasPrefix(e.Repo, "https://github.com/"):
+			pc.display = fmt.Sprintf("%v %v/tree/master{/dir} %v/blob/master{/dir}/{file}#L{line}", e.Repo, e.Repo, e.Repo)
+		case strings.HasPrefix(e.Repo, "https://bitbucket.org"):
+			pc.display = fmt.Sprintf("%v %v/src/default{/dir} %v/src/default{/dir}/{file}#{file}-{line}", e.Repo, e.Repo, e.Repo)
+		}
+		switch {
+		case e.VCS != "":
+			if e.VCS != "bzr" && e.VCS != "git" && e.VCS != "hg" && e.VCS != "svn" {
+				return fmt.Errorf("configuration for %v: unknown VCS %s", path, e.VCS)
+			}
+		case strings.HasPrefix(e.Repo, "https://github.com/"):
+			pc.vcs = "git"
+		default:
+			return fmt.Errorf("configuration for %v: cannot infer VCS from %s", path, e.Repo)
+		}
+		handler.paths = append(handler.paths, pc)
+	}
+	sort.Sort(handler.paths)
 	return nil
 }
 
 // init runs only on a cold start
 func init() {
-	vanityURL := os.Getenv("VANITY_URL")
-	if vanityURL == "" {
-		log.Fatal("VANITY_URL not defined")
-	}
-	InitHandler(context.Background(), vanityURL)
+	InitHandler(context.Background(), os.Getenv("CONFIG_URL"))
 }
 
 // HandleImport handles Go's vanity import requests.
