@@ -92,7 +92,8 @@ var client = &http.Client{
 // This is non-idiomatic but is optimised for google cloud functions.
 // The config is parsed from a yaml file
 // - Fetched from an external source (GoogleCloudStorage/Github).
-func InitHandler(ctx context.Context, configURL string) error {
+// This function accepts an optional localPort for local testing.
+func InitHandler(ctx context.Context, configURL string, localPort string) error {
 	// Fetch the config file from the remote path
 	res, err := client.Get(configURL)
 	if err != nil {
@@ -121,7 +122,12 @@ func InitHandler(ctx context.Context, configURL string) error {
 		return fmt.Errorf("could not parse config: %v", err)
 	}
 
-	handler.host = config.Host
+	if localPort != "" {
+		handler.host = fmt.Sprintf("localhost:%s", localPort)
+	} else {
+		handler.host = config.Host
+	}
+
 	cacheAge := int64(86400) // 24 hours (in seconds)
 	if config.CacheAge != nil {
 		cacheAge = *config.CacheAge
@@ -162,7 +168,7 @@ func InitHandler(ctx context.Context, configURL string) error {
 
 // init runs only on a cold start
 func init() {
-	InitHandler(context.Background(), os.Getenv("CONFIG_URL"))
+	InitHandler(context.Background(), os.Getenv("CONFIG_URL"), os.Getenv("LOCAL_PORT"))
 }
 
 // HandleImport handles Go's vanity import requests.

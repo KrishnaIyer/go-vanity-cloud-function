@@ -12,7 +12,7 @@ func main() {
 	funcframework.RegisterHTTPFunction("/", handler.HandleImport)
 	// Use PORT environment variable, or default to 8080.
 	port := "8080"
-	if envPort := os.Getenv("PORT"); envPort != "" {
+	if envPort := os.Getenv("LOCAL_PORT"); envPort != "" {
 		port = envPort
 	}
 
