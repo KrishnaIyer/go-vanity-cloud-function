@@ -1,0 +1,11 @@
+{
+  "hosting": {
+    "public":"public", 
+    "redirects": [{
+      "source": "/",
+      "destination": "https://<location-project-name>.cloudfunctions.net/<function-name>",
+      "type":302
+    }
+    ]
+  }
+}
