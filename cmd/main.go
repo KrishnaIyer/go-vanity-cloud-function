@@ -5,11 +5,11 @@ import (
 	"os"
 
 	"github.com/GoogleCloudPlatform/functions-framework-go/funcframework"
-	"github.com/KrishnaIyer/go-vanity-cloud-function/handler"
+	functions "github.com/KrishnaIyer/go-vanity-cloud-function"
 )
 
 func main() {
-	funcframework.RegisterHTTPFunction("/", handler.HandleImport)
+	funcframework.RegisterHTTPFunction("/", functions.HandleImport)
 	// Use PORT environment variable, or default to 8080.
 	port := "8080"
 	if envPort := os.Getenv("LOCAL_PORT"); envPort != "" {
