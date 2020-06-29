@@ -2,9 +2,9 @@
   "hosting": {
     "public":"public", 
     "redirects": [{
-      "source": "/",
-      "destination": "https://<location-project-name>.cloudfunctions.net/<function-name>",
-      "type":302
+      "source": "/:project*",
+      "destination": "https://<location-project-name>.cloudfunctions.net/<function-name>/:project",
+      "type":301
     }
     ]
   }

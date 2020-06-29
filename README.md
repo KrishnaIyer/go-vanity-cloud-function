@@ -57,22 +57,25 @@ $ firebase init
    * Leave "What do you want to use as your public directory?" that default.
    * Select `N` for "Configure as a single-page app (rewrite all urls to /index.html)?".
 
-* Remove the `public` folder (as we are not serving any static assets).
+* Remove the contents of the `public` folder (as we are not serving any static assets), but keep the empty folder.
 * Replace the `firebase.json` with the following contents
 
 ```json
 {
   "hosting": {
-    "public":"public",  #dummy entry, but mandatory
+    "public":"public",
     "redirects": [{
-      "source": "/",
-      "destination": "https://<location-project-name>.cloudfunctions.net/<function-name>",
-      "type":302
+      "source": "/:project*",
+      "destination": "https://<location-project-name>.cloudfunctions.net/<function-name>/:project",
+      "type":301
     }
     ]
   }
 }
 ```
+
+The `/:project*` capture group catches the URI after `/` (which is the name of your project) and forwards it to your function.
+
 > You can checkin the above file and the `firebase.rc` file to a VCS to update and redeploy the project.
 
 Once deployed, you check that the redirection works by going to the default Firebase App URL which is of the form `firebase-project-xxxxx.web.app`.
